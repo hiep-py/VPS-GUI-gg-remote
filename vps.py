@@ -6,18 +6,18 @@ CRD_SSH_Code = input("Google CRD SSH Code :")
 username = "user"
 password = "root"
 
-# Tạo user (chạy khi đang ở root)
-os.system(f"useradd -m {username}")
-os.system(f"adduser {username} sudo")
-os.system(f"echo '{username}:{password}' | chpasswd")
-os.system("sed -i 's/\\/bin\\/sh/\\/bin\\/bash/g' /etc/passwd")
+# Tạo user (chạy khi không phải root thì dùng sudo)
+subprocess.run(["sudo", "useradd", "-m", username], check=False)
+subprocess.run(["sudo", "adduser", username, "sudo"], check=False)
+subprocess.run(f"echo '{username}:{password}' | sudo chpasswd", shell=True, check=False)
+subprocess.run(["sudo", "sed", "-i", "s#/bin/sh#/bin/bash#g", "/etc/passwd"], check=False)
 
 Pin = 123456
 Autostart = True
 
 class CRDSetup:
     def __init__(self, user):
-        os.system("apt update -y")
+        subprocess.run(["sudo", "apt", "update", "-y"], check=False)
         self.installCRD()
         self.installDesktopEnvironment()
         self.changewall()
@@ -28,28 +28,30 @@ class CRDSetup:
 
     @staticmethod
     def installCRD():
-        subprocess.run(["wget", "https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb"])
-        subprocess.run(["dpkg", "--install", "chrome-remote-desktop_current_amd64.deb"])
-        subprocess.run(["apt", "install", "-y", "--fix-broken"])
+        subprocess.run(["sudo", "wget", "-q", "https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb"], check=False)
+        subprocess.run(["sudo", "dpkg", "--install", "chrome-remote-desktop_current_amd64.deb"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "--fix-broken"], check=False)
         print("✅ Chrome Remote Desktop Installed")
 
     @staticmethod
     def installDesktopEnvironment():
         os.environ["DEBIAN_FRONTEND"] = "noninteractive"
-        os.system("apt install -y xfce4 desktop-base xfce4-terminal")
-        os.system('bash -c \'echo "exec /etc/X11/Xsession /usr/bin/xfce4-session" > /etc/chrome-remote-desktop-session\'')
-        os.system("apt remove -y gnome-terminal")
-        os.system("apt install -y xscreensaver")
-        os.system("apt purge -y light-locker")
-        os.system("apt install --reinstall -y xfce4-screensaver")
-        os.system("systemctl disable lightdm.service || true")
+        subprocess.run(["sudo", "apt", "install", "-y", "xfce4", "desktop-base", "xfce4-terminal"], check=False)
+        # Viết file session cho chrome-remote-desktop (dùng tee với sudo)
+        session_cmd = 'echo "exec /etc/X11/Xsession /usr/bin/xfce4-session" | sudo tee /etc/chrome-remote-desktop-session > /dev/null'
+        subprocess.run(session_cmd, shell=True, check=False)
+        subprocess.run(["sudo", "apt", "remove", "-y", "gnome-terminal"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "xscreensaver"], check=False)
+        subprocess.run(["sudo", "apt", "purge", "-y", "light-locker"], check=False)
+        subprocess.run(["sudo", "apt", "install", "--reinstall", "-y", "xfce4-screensaver"], check=False)
+        subprocess.run(["sudo", "systemctl", "disable", "lightdm.service"], check=False)
         print("✅ XFCE4 Desktop Environment Installed")
 
     @staticmethod
     def installGoogleChrome():
-        subprocess.run(["wget", "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"])
-        subprocess.run(["dpkg", "--install", "google-chrome-stable_current_amd64.deb"])
-        subprocess.run(["apt", "install", "-y", "--fix-broken"])
+        subprocess.run(["sudo", "wget", "-q", "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"], check=False)
+        subprocess.run(["sudo", "dpkg", "--install", "google-chrome-stable_current_amd64.deb"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "--fix-broken"], check=False)
         print("✅ Google Chrome Installed")
 
     @staticmethod
@@ -59,41 +61,39 @@ class CRDSetup:
         Giữ nhẹ và phù hợp cho VPS có tài nguyên hạn chế.
         """
         print("⏳ Installing Midori (lightweight browser)...")
-        # Try apt install first
-        r = subprocess.run(["apt", "update", "-y"])
-        r = subprocess.run(["apt", "install", "-y", "midori"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["sudo", "apt", "update", "-y"], check=False)
+        r = subprocess.run(["sudo", "apt", "install", "-y", "midori"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         if r.returncode == 0:
             print("✅ Midori installed via apt")
             return
 
-        # Fallback: try download .deb from upstream (Astian/Midori)
         deb_url = "https://astian.org/midori-browser/download/debian/amd64/midori-latest.deb"
         tmp_deb = "/tmp/midori-latest.deb"
         try:
-            subprocess.run(["wget", "-O", tmp_deb, deb_url], check=True)
-            subprocess.run(["dpkg", "--install", tmp_deb], check=False)
-            subprocess.run(["apt", "install", "-y", "--fix-broken"], check=False)
+            subprocess.run(["sudo", "wget", "-O", tmp_deb, deb_url], check=True)
+            subprocess.run(["sudo", "dpkg", "--install", tmp_deb], check=False)
+            subprocess.run(["sudo", "apt", "install", "-y", "--fix-broken"], check=False)
             print("✅ Midori installed via downloaded .deb (fallback)")
         except Exception:
             print("⚠️ Failed to install Midori via fallback. You can install it manually later.")
 
     @staticmethod
     def installQbit():
-        subprocess.run(["apt", "update", "-y"])
-        subprocess.run(["apt", "install", "-y", "qbittorrent"])
+        subprocess.run(["sudo", "apt", "update", "-y"], check=False)
+        subprocess.run(["sudo", "apt", "install", "-y", "qbittorrent"], check=False)
         print("✅ Qbittorrent Installed")
 
     @staticmethod
     def changewall():
         wallpaper_url = "https://gitlab.com/chamod12/changewallpaper-win10/-/raw/main/CachedImage_1024_768_POS4.jpg"
-        wallpaper_file = "xfce-verticals.png"
-        os.system(f"curl -s -L -k -o {wallpaper_file} {wallpaper_url}")
-        current_dir = os.getcwd()
-        src = os.path.join(current_dir, wallpaper_file)
+        wallpaper_file = "/tmp/xfce-verticals.png"
+        # Dùng curl/wget với sudo là không cần, file lưu vào /tmp rồi copy bằng sudo
+        subprocess.run(["wget", "-q", "-O", wallpaper_file, wallpaper_url], check=False)
         dst = "/usr/share/backgrounds/xfce/"
         try:
-            os.makedirs(dst, exist_ok=True)
-            shutil.copy(src, dst)
+            subprocess.run(["sudo", "mkdir", "-p", dst], check=False)
+            subprocess.run(["sudo", "cp", wallpaper_file, dst], check=False)
+            subprocess.run(["sudo", "chown", "root:root", os.path.join(dst, os.path.basename(wallpaper_file))], check=False)
             print("✅ Wallpaper Changed")
         except Exception as e:
             print(f"⚠️ Could not copy wallpaper: {e}")
@@ -101,7 +101,8 @@ class CRDSetup:
     @staticmethod
     def finish(user):
         if Autostart:
-            os.makedirs(f"/home/{user}/.config/autostart", exist_ok=True)
+            autostart_dir = f"/home/{user}/.config/autostart"
+            subprocess.run(["sudo", "mkdir", "-p", autostart_dir], check=False)
             link = "https://www.youtube.com/@LacDev-db2vx"
             colab_autostart = f"""[Desktop Entry]
 Type=Application
@@ -110,15 +111,20 @@ Exec=sh -c "sensible-browser {link}"
 Icon=
 Comment=Open a predefined notebook at session signin.
 X-GNOME-Autostart-enabled=true"""
-            with open(f"/home/{user}/.config/autostart/colab.desktop", "w") as f:
+            # Ghi file vào /tmp rồi sudo mv vào home để đảm bảo quyền
+            tmp_file = f"/tmp/colab_{user}.desktop"
+            with open(tmp_file, "w") as f:
                 f.write(colab_autostart)
-            os.system(f"chmod +x /home/{user}/.config/autostart/colab.desktop")
-            os.system(f"chown -R {user}:{user} /home/{user}/.config")
+            subprocess.run(["sudo", "mv", tmp_file, f"{autostart_dir}/colab.desktop"], check=False)
+            subprocess.run(["sudo", "chmod", "+x", f"{autostart_dir}/colab.desktop"], check=False)
+            subprocess.run(["sudo", "chown", "-R", f"{user}:{user}", f"/home/{user}/.config"], check=False)
 
-        os.system(f"adduser {user} chrome-remote-desktop")
+        subprocess.run(["sudo", "adduser", user, "chrome-remote-desktop"], check=False)
+
         command = f"{CRD_SSH_Code} --pin={Pin}"
-        os.system(f"su - {user} -c '{command}'")
-        os.system("service chrome-remote-desktop start || true")
+        # Chạy lệnh auth dưới user (su - user -c ...)
+        subprocess.run(["sudo", "su", "-", user, "-c", command], check=False)
+        subprocess.run(["sudo", "service", "chrome-remote-desktop", "start"], check=False)
 
         print("====================================================")
         print("✅ Setup Complete")
@@ -128,6 +134,7 @@ X-GNOME-Autostart-enabled=true"""
         print("Autostart link: https://www.youtube.com/@LacDev-db2vx")
         print("====================================================")
 
+        # Lưu ý: vòng lặp vô hạn giữ tiến trình hoạt động giống như script gốc
         while True:
             pass
 
